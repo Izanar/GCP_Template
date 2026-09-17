@@ -1,104 +1,51 @@
-# AWS_Template Project Context
+# GCP_Template — контекст проекта для ИИ-агентов
 
-## Актуальный статус — 2026-09-17
+## Что это
 
-**Этот раздел заменяет исторические утверждения о версиях и готовности ниже.**
-Проверенный отчёт: [docs/completion-context.md](docs/completion-context.md).
-Terraform 1.9.8 / Terragrunt 0.68.2; EC2 provider 6.x, EKS provider 5.x;
-локальный сценарий без AWS provider. Статические проверки и 5 регрессионных тестов
-проходят. Полный E2E не завершён: WSL без systemd; AWS не запускался ради нулевых
-новых расходов. GitHub Deploy теперь только инфраструктурный, требует существующий
-S3 backend и DynamoDB lock table. Состояние вне кэша. Оставшиеся ограничения и
-очистка: [docs/completion.md](docs/completion.md).
+Terraform/Terragrunt-шаблон для Google Cloud, созданный как копия-аналог `AWS_Template`.
+`AWS_Template` — эталон, его не трогать.
 
-## Исторический контекст (не отчёт о текущих проверках)
+## Сценарии (envs/*)
 
+| Сценарий | Что разворачивает | Статус в планах |
+|---|---|---|
+| `gce` | Compute Engine `e2-micro` (preemptible) + nginx через Ansible | в планах |
+| `gke-autopilot` | GKE Autopilot + Secret Manager | НЕ в планах (дорого) |
+| `gke-gcs-cdn` | GKE Standard + приватный GCS + Cloud CDN | НЕ в планах (дорого) |
+| `local-wsl` | k3s в WSL2, NodePort 30080 | дефолтный, бесплатный |
 
-## Summary
+Код, README и все четыре сценария сохраняются независимо от планов. «НЕ в планах» значит:
+не запускать `apply` для этих сценариев без явной команды пользователя, и не включать их
+в планы выполнения агентов. Из кода и README они не удаляются.
 
-The repository was transformed into a reusable Terraform/Ansible/Kubernetes
-template with Terragrunt. The previous intermediate layout (`modules/`,
-`terraform/`, `terragrunt/`) was replaced by four self-contained environment
-roots under `src/`, wired to the Terragrunt units under `envs/`.
+## Правила работы (обязательно к прочтению перед любым действием)
 
-## What Has Been Done
+1. Сначала факты, потом действия: `git status`, `git log`, фактическое содержимое файлов.
+   Не полагаться на память о прошлых шагах и на предыдущие выводы инструментов.
+2. README.md, код и сценарии не удалять — только адаптировать под GCP.
+3. Дорогие облачные сценарии (`gke-*`) в планы выполнения не включать.
+4. После завершения изменений — коммит и пуш в `origin`
+   (`git@github.com:Izanar/GCP_Template.git`, SSH), затем проверка `git ls-remote origin`.
+5. Валидация — `make validate` (fmt, validate, yamllint, ansible-lint, shellcheck, pytest).
+   Тяжёлые прогоны и установки инструментов согласовывать с пользователем.
+6. `.terraform.lock.hcl` и `venvs/` игнорируются `.gitignore` — не коммитить.
 
-### Self-contained Terraform roots (`src/`)
-- `src/ec2` (main.tf, variables.tf, outputs.tf) - EC2 + budget
-- `src/eks-fargate` (main.tf, variables.tf, outputs.tf) - VPC + EKS + budget
-- `src/eks-ec2-s3` (main.tf, variables.tf, outputs.tf) - VPC + EKS + S3 + CloudFront + budget
-- `src/local-wsl` (main.tf, variables.tf, outputs.tf) - k3s via local-exec
+## Технические факты
 
-Each root is cache-safe: no relative sibling paths, only registry modules from
-`terraform-aws-modules`.
+- Terraform `>= 1.9`, провайдер `google ~> 8.3` ( constraints в `src/*/versions.tf`).
+- `root.hcl`: GCS-backend только при заданном `TF_STATE_BUCKET`, иначе локальный стейт;
+  `local-wsl` всегда локальный. Стейт не создаётся шаблоном.
+- kubeconfig для local-wsl: `~/.kube/gcp-template-k3s.yaml`.
+- Образ приложения: `ghcr.io/izanar/gcp-template-kubernetes` (собирает `build-images.yml`).
+- Переменные окружения: `GOOGLE_PROJECT`, `GOOGLE_REGION` (по умолчанию `europe-west1`),
+  `GOOGLE_ZONE`, `BUDGET_EMAIL`, `BILLING_ACCOUNT`, `GOOGLE_PROJECT_NUMBER`,
+  `TF_VAR_public_key_path`, `TF_VAR_ssh_cidr_blocks`.
+- Бюджет-алерт (`google_billing_budget`) опционален: создаётся только при заданных
+  `BUDGET_EMAIL` и `BILLING_ACCOUNT`.
 
-### Terragrunt Configuration
-- Root `root.hcl` with provider generation (aws ~> 6.0, Terraform >= 1.9)
-  and common locals
-- Environment configurations with `terraform.source` pointing to `src/*`:
-  - `envs/ec2/terragrunt.hcl`
-  - `envs/eks-fargate/terragrunt.hcl`
-  - `envs/eks-ec2-s3/terragrunt.hcl`
-  - `envs/local-wsl/terragrunt.hcl`
+## Статус
 
-### Ansible Roles and Playbooks
-- Roles: `nginx`, `deploy_site`, `eks`
-- Playbooks: `ansible/playbooks/ec2.yml`, `ansible/playbooks/eks-deploy.yml`
-
-### Kubernetes Manifests
-- Base manifests in `kubernetes/base/`: `namespace.yaml`, `deployment.yaml`, `service.yaml`
-- Local manifests in `kubernetes/local/`: `namespace.yaml`, `deployment.yaml`, `service.yaml`
-
-### GitHub Actions
-- `validate.yml` - CI on push/PR (terraform fmt/validate, ansible, yamllint, shellcheck)
-- `deploy.yml` - manual apply/destroy per scenario with AWS OIDC
-- `build-images.yml` - manual image builds from the AI_Nginx repository
-
-### Scripts
-- `scripts/deploy.sh`, `scripts/destroy.sh` - scenario-aware lifecycle control
-- `scripts/install-wsl-kubernetes.sh` - WSL k3s installer
-
-### Tooling
-- Makefile with validate/fmt/init/plan/apply/destroy/output/lint/test targets
-- pre-commit configuration (terraform, ansible-lint, yamllint, shellcheck)
-- Documentation in `docs/`
-
-## Validation status
-
-- Terraform: `terraform init` + `validate` pass for all `src/*` roots (TF 1.9.8,
-  AWS provider 6.x for EC2, 5.x for EKS; no AWS provider for local-wsl)
-- Terragrunt: `render` + `init` pass for all four envs; `plan` pass for
-  `local-wsl` (no cloud credentials needed)
-- Ansible: playbook syntax checks pass
-- Kubernetes: manifests parse cleanly under yamllint
-
-## What Remains to Be Done
-
-- [x] Run `terragrunt apply` against a real AWS account for `ec2` (2026-09-17:
-      Spot t3.micro, Ansible deploy, HTTP smoke test, destroy; cleanup verified
-      through AWS API - instance/volume/SG/keypair/Spot request all gone, state empty)
-- [x] Deploy the demo workload on the `ec2` scenario and observe the smoke test
-      (live). Local k3s application E2E is also complete; see docs/completion-context.md.
-- [x] If the previous `modules/` layout is still referenced anywhere (docs,
-      branches), update or remove those references (verified: only historical references in architecture doc)
-- [x] Fix Fargate profile selector in `src/eks-fargate/main.tf` (`weather-demo` -> `ai-nginx-demo`)
-- [x] Automated offline regression tests: 13 unittest checks (template, S3
-      delivery with a recorded fake AWS CLI, rendered manifests, k3s registration)
-- [x] Live application E2E for `local-wsl`: deploy, browser/HTTP checks, destroy;
-      state empty and app resources removed. Owner also uninstalled k3s and
-      removed checkout/kubeconfig; absence independently verified.
-
-## Explicitly NOT planned (do not schedule for agents)
-
-- Live `terragrunt apply`/`destroy` for `eks-fargate` and `eks-ec2-s3`.
-  The code, README entries and scenarios stay as reference implementations,
-  but running them is deliberately out of scope (costly control plane/NAT).
-  Do not re-add them to plans, checklists or "next steps" lists.
-- Terratest / InSpec / k8s conformance suites (offline tests cover the gates).
-
-## Next Steps for Continuation
-
-1. Local E2E and full test-cluster cleanup are complete; no local cleanup pending.
-2. Check the Billing entry for the completed EC2 test once data settles.
-3. Optional later: real GitHub OIDC + S3 state backend for the Deploy workflow;
-   a first CI run without `[skip ci]` to turn the badge green.
+- Код, скрипты, Ansible, k8s-манифесты, CI приведены к GCP (коммит `4f0c189`).
+- README.md переписан под GCP.
+- Документация `docs/`, `project_map.md`, этот файл — переписаны под GCP.
+- Живой E2E не проводился: нужны реальные учётные данные GCP (см. `docs/e2e.md`).

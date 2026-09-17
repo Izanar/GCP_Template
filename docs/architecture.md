@@ -1,44 +1,58 @@
-# Architecture
+# Архитектура GCP_Template
 
-AWS_Template is split into four layers:
+## Общая схема
 
-```
-└── root.hcl                  Root config: shared locals + generated provider.tf
-    ├── envs/                 One Terragrunt unit per environment
-    │   ├── ec2/
-    │   ├── eks-fargate/
-    │   ├── eks-ec2-s3/
-    │   └── local-wsl/
-    ├── src/                  Self-contained Terraform roots (sources)
-    │   ├── ec2/          EC2 + budget
-    │   ├── eks-fargate/  VPC + EKS + budget
-│   ├── eks-ec2-s3/   VPC + EKS + S3 + CloudFront + budget (audio from S3)
-    │   └── local-wsl/    k3s install
-    ├── ansible/              Playbooks and roles
-    ├── kubernetes/base/      Manifests for the demo workload
-    ├── scripts/              Helper scripts
-    ├── docs/                 This documentation
-    └── .github/workflows/    CI/CD
-```
+Terragrunt-репозиторий: `root.hcl` задаёт провайдера и backend, `envs/*` — точки входа
+сценариев, `src/*` — Terraform-модули, `scripts/` и `ansible/` — пост-настройка и деплой
+приложения.
 
-## Data flow
+## Сценарии
 
-1. Terragrunt reads `envs/<scenario>/terragrunt.hcl`.
-2. The root `terragrunt.hcl` generates `provider.tf` (aws region and provider
-   versions) into the unit working directory and provides shared defaults such
-   as the budget email or the AWS region.
-3. The unit points `terraform.source` at the matching self-contained root under
-   `src/` and passes its `inputs` as Terraform variables.
-4. `terraform` (through Terragrunt) creates the infrastructure.
-5. For `ec2`, `scripts/deploy.sh` runs the `nginx` Ansible role against the
-   new instance and smoke-tests the site.
-6. For Kubernetes scenarios, the `eks` Ansible role applies the manifests from
-   `kubernetes/base/`.
+### gce (дешёвый облачный)
 
-## Why self-contained roots?
+- `google_compute_instance` `e2-micro`, `pd-balanced` 10 GB, Ubuntu 22.04, preemptible
+  (аналог Spot).
+- Firewall: SSH только из `TF_VAR_ssh_cidr_blocks` (ваш IP/32), HTTP/HTTPS — 0.0.0.0/0.
+- Публичный ephemeral IP → output `public_ip`.
+- Ansible (`roles/nginx`) ставит nginx и выкладывает AI_Nginx из
+  `github.com/Izanar/AI_Nginx`.
+- Опционально: `google_billing_budget` + email-канал уведомлений.
 
-Terragrunt copies the source directory into its cache and runs Terraform from
-there. Relative paths like `../shared-module` therefore break. Keeping every
-environment root self-contained (only registry modules plus inlined resources)
-makes deployments predictable and cache-safe. The previous `modules/` layout
-was removed for this reason; see CONTEXT.md for the history.
+### gke-autopilot
+
+- `google_container_cluster` с `enable_autopilot = true` (Google управляет нодами),
+  Workload Identity, региональный кластер.
+- Пароль приложения: `random_password` → Secret Manager.
+- Деплой приложения — плейбук `gke-deploy.yml` (манифесты `kubernetes/base`,
+  образ `ghcr.io/izanar/gcp-template-kubernetes`).
+
+### gke-gcs-cdn
+
+- GKE Standard: regional cluster, node pool `e2-small` (Spot, autoscaling 1–2),
+  default node pool удаляется.
+- Приватный `google_storage_bucket` (uniform bucket-level access, public access
+  prevention, versioning, lifecycle Delete через 7 дней) — аудио приложения.
+- Доступ CDN к приватному бакету — `google_storage_bucket_iam_member`
+  (`roles/storage.objectViewer` сервис-аккаунту Cloud CDN `service-<PROJECT_NUMBER>@cloud-cdn.gserviceaccount.com`).
+- Раздача: `google_compute_backend_bucket` (enable_cdn) → url_map → http-proxy →
+  global forwarding rule :80 → статический `cdn_ip`.
+- Аудио заливает `scripts/sync-audio-to-gcs.sh` (gsutil rsync, только добавление).
+
+### local-wsl
+
+- Без облака: `scripts/install-wsl-kubernetes.sh` ставит k3s (systemd в WSL2),
+  kubeconfig → `~/.kube/gcp-template-k3s.yaml`.
+- Деплой манифестов `kubernetes/local` (hostPath, NodePort 30080), smoke-тест curl.
+
+## Стейт и доступ
+
+- Backend: локальный по умолчанию; GCS при `TF_STATE_BUCKET`
+  (`<prefix>/<region>/<env>`), лочится версионированием объектов GCS.
+- Провайдер `google` генерируется в `root.hcl` (`project`, `region` из окружения);
+  `local-wsl` получает минимальный провайдер без учётных данных.
+
+## CI/CD
+
+- `validate.yml` — fmt/validate/линтеры/pytest на PR и push.
+- `build-images.yml` — сборка образа приложения в GHCR.
+- `deploy.yml` — деплой по секретам GCP (заполняются при первом реальном использовании).

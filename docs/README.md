@@ -1,33 +1,21 @@
-# AWS_Template documentation
+# Документация GCP_Template
 
-Welcome to the AWS_Template documentation. This project is a hands-on,
-reusable infrastructure template that demonstrates the
-[AI_Nginx](https://github.com/Izanar/AI_Nginx) demo application deployed with
-four different setups:
+Набор документов по проекту. Проект — GCP-версия шаблона, созданная на основе `AWS_Template`.
 
-| Scenario | Infrastructure | Applies to |
-|---|---|---|
-| `ec2` | AWS Spot EC2 + nginx, configured with Ansible | Cloud (AWS) |
-| `eks-fargate` | AWS EKS cluster (Fargate profiles) | Cloud (AWS) |
-| `eks-ec2-s3` | AWS EKS + S3 + CloudFront with OAC | Cloud (AWS) |
-| `local-wsl` | k3s on WSL2, no cloud required | Local (WSL2) |
+| Документ | Содержание |
+|---|---|
+| [usage.md](usage.md) | Как пользоваться: make-цели, deploy.sh, переменные окружения |
+| [architecture.md](architecture.md) | Архитектура сценариев и модулей |
+| [development.md](development.md) | Среда разработки, инструменты, конвенции |
+| [e2e.md](e2e.md) | Что такое E2E и что нужно для «Живого E2E» |
+| [completion.md](completion.md) | Отчёт о выполненной адаптации под GCP |
+| [completion-context.md](completion-context.md) | Контекст для продолжения работы другими агентами |
 
-Terraform defines the infrastructure, Terragrunt supplies per-environment
-values, Ansible configures the running servers/clusters, and Kubernetes
-manifests describe the deployed workload.
+## Сценарии
 
-## Table of contents
+- `gce` — Compute Engine + nginx (дешёвый облачный).
+- `gke-autopilot` — GKE Autopilot (код есть, в планах выполнения агентов НЕ значится).
+- `gke-gcs-cdn` — GKE + приватный GCS + Cloud CDN (код есть, в планах НЕ значится).
+- `local-wsl` — локальный k3s, бесплатно, дефолт для проверок.
 
-- [Architecture](architecture.md) - repository layout and data flow
-- [Usage](usage.md) - local control, CI/CD, requirements
-- [Development](development.md) - validation, testing, contributing
-
-## Prerequisites
-
-- Terraform `>= 1.9.0`
-- Terragrunt `>= 0.68.0`
-- Ansible `core 2.15+` (only for `ec2` / EKS deploys)
-- AWS CLI (only for cloud scenarios)
-
-`make install-tools` installs Terraform, Terragrunt and the Python tooling
-into `~/.local/bin` and `~/venvs/tools` (latest releases).
+Быстрый старт: `make install-tools`, `make validate`, `./scripts/deploy.sh local-wsl`.

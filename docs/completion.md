@@ -1,72 +1,37 @@
-# Контроль затрат, state и очистка
+# Отчёт о выполнении: адаптация AWS_Template → GCP_Template
 
-## Бесплатный путь
+## Выполнено
 
-В WSL2 PID 1 должен быть `systemd`. Для включения добавьте в `/etc/wsl.conf`
-секцию `[boot]` с `systemd=true` и выполните `wsl --shutdown` из Windows
-PowerShell. Команда остановит все WSL-процессы; затем откройте WSL снова.
-Для установки k3s нужен sudo. Установите make, curl, git, Python/venv заранее;
-`make install-tools` не устанавливает AWS CLI, kubectl или системный make.
+1. **Terraform-модули** (`src/`): `gce`, `gke-autopilot`, `gke-gcs-cdn`, `local-wsl` —
+   все на провайдере `google ~> 8.3`. Проверены `terraform validate` по каждому.
+2. **Terragrunt**: `root.hcl` (GCS/локальный backend, провайдер), `envs/*` под GCP.
+   Проверено: `hclfmt`, `validate-inputs` по всем средам, полный `init + plan`
+   для `local-wsl` (`Plan: 1 to add`), `terragrunt init` для облачных сред.
+3. **Скрипты**: `deploy.sh`, `destroy.sh` (интерактив: project/region/budget/подтверждение
+   расходов), `sync-audio-to-gcs.sh` (gsutil rsync, только добавление),
+   `install-wsl-kubernetes.sh` (kubeconfig `~/.kube/gcp-template-k3s.yaml`).
+   Пройден `bash -n` всех скриптов.
+4. **Ansible**: плейбуки `gce.yml`, `gke-deploy.yml`, `gke-gcs-deploy.yml`; роли
+   `nginx`, `gke`, `gke_gcs` (валидация env-переменных, заливка аудио в GCS,
+   деплой манифестов, smoke-тесты).
+5. **Kubernetes**: `kubernetes/base` (GKE) и `kubernetes/local` (k3s) — образ
+   `ghcr.io/izanar/gcp-template-kubernetes`.
+6. **CI**: `validate.yml`, `build-images.yml`, `deploy.yml` — под GCP/GHCR.
+7. **Документация**: `README.md`, `CONTEXT.md`, `project_map.md`, `docs/*` — переписаны
+   под GCP. Дорогие сценарии (`gke-*`) исключены из планов выполнения агентов, но
+   код, README и сценарии сохранены (требование пользователя).
+8. **Git**: история — `73055f4` (initial), `4f0c189` (convert to GCP), далее коммит
+   документации. Remote `origin` = `git@github.com:Izanar/GCP_Template.git`, пуш по SSH.
 
-Из корня репозитория:
+## Валидация
 
-```bash
-export PATH="$HOME/.local/bin:$HOME/venvs/tools/bin:$PATH"
-make test
-./scripts/deploy.sh local-wsl
-export KUBECONFIG="$HOME/.kube/aws-template-k3s.yaml"
-kubectl get pods -n ai-nginx-demo
-curl --fail http://localhost:30080
-./scripts/destroy.sh local-wsl
-```
+- `make validate`: fmt/validate/линтеры/pytest — проходит.
+- Lock-файлы `.terraform.lock.hcl` (google 8.3.0) совпадают с constraint `~> 8.3`,
+  в git не попадают (`.gitignore`).
 
-Destroy удаляет приложение и Terraform-маркеры, но сохраняет k3s и checkout.
-На выделенном тестовом хосте для полной очистки кластера выполните
-`sudo /usr/local/bin/k3s-uninstall.sh`; он удаляет **весь** локальный k3s,
-включая чужие workload, если они есть. Checkout `/opt/ai-nginx`, отдельный
-kubeconfig и ручные Windows portproxy/firewall правила удаляются отдельно.
-Ни один из этих локальных компонентов не создаёт AWS-начислений.
+## Что осталось (осознанно)
 
-## State: не потерять возможность удаления
-
-Локально state расположен в `envs/<scenario>/terraform.tfstate`, не в
-`.terragrunt-cache`. Старый state из кэша нужно сохранить и мигрировать
-`terragrunt init -migrate-state` до удаления кэша или нового apply.
-Не запускайте apply с пустым state поверх существующих ресурсов!
-
-CI требует существующие encrypted/versioned S3 bucket и DynamoDB lock table:
-repository variables `TF_STATE_BUCKET`, `TF_STATE_REGION`, `TF_LOCK_TABLE`.
-Секреты: `AWS_ROLE_ARN`, для EC2 `AWS_SSH_PUBLIC_KEY`; `BUDGET_EMAIL` опционален.
-Backend не создаётся автоматически и сам может стоить денег.
-Ключ state включает регион и сценарий. Apply/destroy должны использовать
-одинаковый аккаунт, backend, регион, сценарий и параметры.
-GitHub Deploy создаёт **только инфраструктуру**; полный путь приложения — скрипт.
-
-## Если AWS всё-таки использовался ранее
-
-1. Найдите исходный state, аккаунт и регион. Сохраните защищённую резервную копию.
-2. Просмотрите ресурсы через `terragrunt state list` в соответствующем env.
-3. Запустите `scripts/destroy.sh <scenario>` или ручной workflow destroy с тем же backend.
-   При ошибке устраните причину и повторите; ошибка destroy не означает очистку.
-4. Проверьте пустой state и AWS Console/API во всех использованных регионах:
-   EC2/Spot, EBS, EIP, NAT Gateways, EKS/node groups/Fargate, load balancers,
-   S3 (версии и multipart uploads), CloudFront, CloudWatch logs, Secrets Manager.
-   Ресурсы вне state нужно проверять отдельно; не удаляйте чужие ресурсы.
-5. Проверьте Billing/Cost Explorer после задержки обновления данных. Destroy
-   прекращает последующее потребление, но не отменяет уже начисленную стоимость.
-6. Лишь после этого отдельно удаляйте выделенный backend и lock table, если они
-   не нужны другим проектам, включая версии объектов state. Общий backend не удаляйте.
-
-**Budget $5 — уведомление, не ограничитель и не автоматическое выключение.**
-EKS control plane, NAT, public IPv4, storage и прочее оплачиваются даже без приложения.
-Для нулевых новых облачных затрат не запускайте облачный apply.
-
-## Требования к приложению
-
-- EKS образы должны быть опубликованы и доступны без приватных pull credentials;
-  образ содержит приложение и curl. Содержимое живых подов не модифицируется.
-- Для EKS проверьте поддерживаемую версию Kubernetes, DNS и readiness.
-- Только `eks-ec2-s3` создаёт S3/CloudFront для аудио. Плейбук `eks-s3-deploy`
-  загружает `html/audio/` из репозитория AI_Nginx скриптом
-  `scripts/sync-audio-to-s3.sh`; nginx отправляет `/audio/*` на CloudFront.
-- Сквозная проверка и очистка описаны в [e2e.md](e2e.md).
+- **Живой E2E на GCP** не проводился: нужны реальный проект, биллинг и явное
+  разрешение на расходы (см. `docs/e2e.md`).
+- Секреты для `deploy.yml` (workload identity / service account key) заполняются
+  при первом реальном использовании.

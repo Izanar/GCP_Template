@@ -1,65 +1,49 @@
-# Живой E2E: что это и как провести
+# E2E: что это и что нужно для «Живого E2E»
 
-## Что такое E2E
+## Что значит E2E
 
-**E2E (end-to-end, «сквозной»)** — проверка всей цепочки на реальной инфраструктуре,
-а не статических файлов:
+**E2E (end-to-end)** — сквозной тест: проверяется весь путь от чистого состояния до
+работающего приложения, как это сделал бы пользователь, а не отдельные модули.
+В этом проекте E2E-цепочка выглядит так:
 
-1. `terragrunt apply` создаёт **реальные** ресурсы (облачные или локальные).
-2. Приложение реально установлено и запущено (Ansible / kubectl), поды проходят
-   readiness-пробы.
-3. **Трафик проходит через весь стек снаружи**: HTTP-запрос возвращает содержимое
-   приложения (Kyiv Skyline, а не заглушку nginx); для аудио-сценария — скачивается
-   файл через CDN.
-4. Ресурсы удаляются; очистка подтверждается через API/`kubectl` и пустой state.
-
-Статические проверки (`make test`) и `terragrunt plan` E2E **не заменяют**: они не
-создают ресурсы и не проверяют трафик.
-
-## `ec2` — чек-лист живого прогона
-
-Предварительно:
-- AWS-аккаунт и credentials в профиле (`aws configure --profile aws-template`):
-  права на `sts`, EC2 (инстансы, SG, key pairs).
-- Подтверждение затрат: Spot t3.micro ≈ $0.0056/ч + публичный IPv4 ≈ $0.005/ч.
-  Budget — уведомление, а не лимит. Типовая длительность теста — минуты.
-- Инструменты: `make install-tools` (Terraform, Terragrunt, Ansible), AWS CLI,
-  SSH-пара `~/.ssh/id_ed25519(.pub)`, `git`, `curl`.
-
-Шаги: `terragrunt plan` → явное подтверждение → `apply` сохранённого плана →
-Ansible (nginx + AI_Nginx) → `curl http://<ip>/` возвращает страницу →
-`destroy` → проверка через AWS API, что инстанс/volume/SG/keypair/Spot-request
-отсутствуют и state пуст.
-
-## `local-wsl` — бесплатный живой E2E (чек-лист)
-
-Однократная подготовка:
-- Включить systemd в WSL2: в `/etc/wsl.conf` добавить
-  `[boot]` и `systemd=true`, затем из Windows PowerShell выполнить `wsl --shutdown`
-  (остановит все WSL-процессы) и снова открыть WSL.
-- Sudo-пароль пользователя; системные пакеты `make`, `curl`, `git`,
-  `python3-venv` (`sudo apt install make curl git python3-venv`).
-- `make install-tools` — Terraform, Terragrunt, Ansible (AWS CLI и k3s не нужны).
-
-Прогон из корня репозитория:
-
-```bash
-export PATH="$HOME/.local/bin:$HOME/venvs/tools/bin:$PATH"
-make test
-./scripts/deploy.sh local-wsl        # ставит k3s + kubectl, деплоит приложение
-export KUBECONFIG="$HOME/.kube/aws-template-k3s.yaml"
-kubectl get nodes                    # узел в состоянии Ready
-kubectl get pods -n ai-nginx-demo    # под ai-nginx-app Ready (readiness-проба)
-curl --fail http://localhost:30080   # ожидаем Kyiv Skyline
-./scripts/destroy.sh local-wsl
+```
+инструменты → terragrunt init/plan/apply → приложение (nginx/AI_Nginx) → smoke-тест curl → destroy
 ```
 
-Критерий успеха: узел Ready, под Ready, curl отдаёт страницу; после destroy
-манифесты удалены, Terraform-маркеры сняты. k3s остаётся установленным —
-полная очистка кластера (`sudo k3s-uninstall.sh`) только на выделенном хосте.
+«Сухой E2E» — то же, но без создания облакных ресурсов: `make validate`, `terraform validate`,
+pytest, деплой `local-wsl`. Это уже выполнено в рамках адаптации.
 
-## EKS
+## Что нужно для Живого E2E (реальное облако GCP)
 
-Сценарии описаны в [usage.md](usage.md). Создание control plane, NAT и других
-облачных ресурсов требует явного согласия на затраты. Для аудио-сценария
-дополнительно проверяют загрузку из AI_Nginx в S3 и доставку через CloudFront.
+1. **Учётная запись GCP**: проект с включённым биллингом.
+2. **gcloud SDK** (`gcloud`, `gsutil`) и аутентификация:
+   ```bash
+   gcloud auth login
+   gcloud auth application-default login
+   gcloud config set project <PROJECT_ID>
+   ```
+3. **Включённые API**: `compute.googleapis.com`, `container.googleapis.com`,
+   `secretmanager.googleapis.com`, `monitoring.googleapis.com`
+   (для бюджетов — `billingbudgets.googleapis.com`).
+4. **SSH-ключ** `~/.ssh/id_rsa(.pub)` — для сценария `gce`.
+5. **GitHub SSH-доступ** — уже настроен (пуш в `git@github.com:Izanar/GCP_Template.git`).
+6. **kubectl** — для GKE-сценариев и local-wsl.
+7. **Подтверждение расходов**: `deploy.sh` спросит проект, регион и yes на создание
+   платных ресурсов. Дешёвый вариант — `gce` (`e2-micro` preemptible, < 1 USD/день).
+   GKE-сценарии дороже — они сознательно не в планах агентов.
+
+## Чек-лист живого прогона (пример для gce)
+
+```bash
+./scripts/deploy.sh gce        # ответить: project, region, email (опц.), yes
+# ожидаемо: вывод public_ip, «Smoke test OK»
+curl http://<PUBLIC_IP>
+./scripts/destroy.sh gce       # ответить yes
+```
+
+Для `local-wsl` облако не нужно: `./scripts/deploy.sh local-wsl` → `http://localhost:30080`.
+
+## Статус
+
+Живой E2E на GCP **не проводился** — требуются реальные учётные данные и явное
+разрешение на расходы. Все «сухие» проверки проходят (`make validate`).
