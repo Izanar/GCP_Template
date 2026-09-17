@@ -1,0 +1,16 @@
+---
+- name: Prepare Ubuntu web server
+  hosts: webservers
+  become: true
+  vars:
+    app_dir: /var/www/html
+    app_repo_url: "https://github.com/Izanar/AI_Nginx.git"
+    app_cache_dir: /tmp/ai-nginx
+  pre_tasks:
+    - name: Wait for SSH
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+      tags: always
+  gather_facts: false
+  roles:
+    - role: "{{ playbook_dir }}/../roles/nginx"

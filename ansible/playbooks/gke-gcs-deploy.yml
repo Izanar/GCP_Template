@@ -1,0 +1,15 @@
+---
+- name: Deploy GKE with private GCS audio delivery
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    app_repo_url: "https://github.com/Izanar/AI_Nginx.git"
+    audio_bucket_name: "{{ lookup('env', 'AUDIO_BUCKET_NAME') }}"
+    cdn_domain: "{{ lookup('env', 'CDN_DOMAIN') }}"
+    image_repository: "ghcr.io/izanar/gcp-template-kubernetes"
+    image_tag: "{{ lookup('env', 'APP_IMAGE_TAG') | default('latest', true) }}"
+    k8s_namespace: ai-nginx-demo
+    deployment_name: ai-nginx-app
+  roles:
+    - role: "{{ playbook_dir }}/../roles/gke_gcs"

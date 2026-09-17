@@ -1,0 +1,10 @@
+---
+# Ansible-lint configuration
+# https://ansible.readthedocs.io/projects/lint/configuring/
+skip_list:
+  # Roles live in ansible/roles/ while playbooks live in ansible/playbooks/,
+  # so the playbooks reference their roles with an explicit playbook_dir path.
+  - role-name[path]
+  # git clones are intentionally non-idempotent in these demo roles;
+  # the checkout is removed right after use.
+  - latest[git]

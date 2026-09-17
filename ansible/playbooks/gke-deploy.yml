@@ -1,0 +1,19 @@
+---
+- name: Deploy the GKE application
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    kubernetes_manifests:
+      - "{{ playbook_dir }}/../../kubernetes/base/namespace.yaml"
+      - "{{ playbook_dir }}/../../kubernetes/base/deployment.yaml"
+      - "{{ playbook_dir }}/../../kubernetes/base/service.yaml"
+    app_repo_url: "https://github.com/Izanar/AI_Nginx.git"
+    app_cache_dir: /tmp/ai-nginx
+    image_repository: "ghcr.io/izanar/gcp-template-kubernetes"
+    image_tag: "{{ lookup('env', 'APP_IMAGE_TAG') | default('latest', true) }}"
+    k8s_namespace: "ai-nginx-demo"
+    deployment_name: "ai-nginx-app"
+    app_label: "ai-nginx-app"
+  roles:
+    - role: "{{ playbook_dir }}/../roles/gke"

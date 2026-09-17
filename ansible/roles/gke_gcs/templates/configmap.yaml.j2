@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-nginx-audio
+  namespace: {{ k8s_namespace }}
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name _;
+        root /usr/share/nginx/html;
+        index index.html;
+        location /audio/ {
+            return 302 https://{{ cdn_domain }}$request_uri;
+        }
+        location / {
+            try_files $uri $uri/ =404;
+        }
+    }

@@ -1,0 +1,91 @@
+name: Infrastructure (manual only)
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Scenario
+        type: choice
+        required: true
+        options: [gce, gke-autopilot, gke-gcs-cdn]
+      action:
+        description: Terraform infrastructure action (application deploy is separate)
+        type: choice
+        required: true
+        options: [apply, destroy]
+      confirm_costs:
+        description: Accept GCP charges (budgets are alerts, not spending caps)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: gcp
+    timeout-minutes: 60
+    concurrency:
+      group: gcp-${{ vars.GOOGLE_PROJECT }}-${{ vars.GOOGLE_REGION }}-${{ inputs.scenario }}
+      cancel-in-progress: false
+    env:
+      GOOGLE_PROJECT: ${{ vars.GOOGLE_PROJECT }}
+      GOOGLE_REGION: ${{ vars.GOOGLE_REGION }}
+      GOOGLE_ZONE: ${{ vars.GOOGLE_ZONE }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_STATE_PREFIX: gcp-template
+      CDN_DOMAIN: ${{ vars.CDN_DOMAIN }}
+      BUDGET_EMAIL: ${{ vars.BUDGET_EMAIL }}
+      BILLING_ACCOUNT: ${{ vars.BILLING_ACCOUNT }}
+      TF_VAR_ssh_cidr_blocks: ${{ vars.SSH_CIDR_BLOCKS || '[]' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Require persistent state and cost confirmation before authentication
+        env:
+          ACTION: ${{ inputs.action }}
+          CONFIRM_COSTS: ${{ inputs.confirm_costs }}
+        run: |
+          if [ "$ACTION" = apply ] && [ "$CONFIRM_COSTS" != true ]; then
+            echo 'Explicit confirmation of GCP costs is required'; exit 1
+          fi
+          test -n "$TF_STATE_BUCKET" || { echo 'Set TF_STATE_BUCKET to an existing versioned GCS bucket'; exit 1; }
+          test -n "$GOOGLE_PROJECT" || { echo 'Set GOOGLE_PROJECT'; exit 1; }
+          test -n "$GOOGLE_REGION" || { echo 'Set GOOGLE_REGION'; exit 1; }
+      - name: Authenticate using Workload Identity Federation
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GOOGLE_PROJECT }}
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.9.8'
+          terraform_wrapper: false
+      - name: Set up Terragrunt
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL https://github.com/gruntwork-io/terragrunt/releases/download/v0.68.2/terragrunt_linux_amd64 \
+            -o "$HOME/.local/bin/terragrunt"
+          chmod +x "$HOME/.local/bin/terragrunt"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Prepare GCE public key
+        if: inputs.scenario == 'gce'
+        env:
+          SSH_PUBLIC_KEY: ${{ secrets.GCP_SSH_PUBLIC_KEY }}
+        run: |
+          test -n "$SSH_PUBLIC_KEY" || { echo 'GCP_SSH_PUBLIC_KEY is required'; exit 1; }
+          printf '%s\n' "$SSH_PUBLIC_KEY" > "$RUNNER_TEMP/gcp-template.pub"
+          echo "TF_VAR_public_key_path=$RUNNER_TEMP/gcp-template.pub" >> "$GITHUB_ENV"
+      - name: Apply or destroy infrastructure
+        env:
+          SCENARIO: ${{ inputs.scenario }}
+          ACTION: ${{ inputs.action }}
+        run: |
+          case "$SCENARIO" in gce|gke-autopilot|gke-gcs-cdn) ;; *) exit 1;; esac
+          case "$ACTION" in apply|destroy) ;; *) exit 1;; esac
+          # Empty optional repository variable must not mask the region-derived zone default.
+          if [ -z "$GOOGLE_ZONE" ]; then unset GOOGLE_ZONE; fi
+          cd "envs/$SCENARIO"
+          terragrunt init -input=false --terragrunt-non-interactive
+          terragrunt "$ACTION" -input=false -auto-approve --terragrunt-non-interactive

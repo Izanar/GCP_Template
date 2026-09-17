@@ -1,0 +1,31 @@
+---
+- name: Check kubectl is available
+  ansible.builtin.command: "{{ item.command }}"
+  loop:
+    - command: kubectl version --client
+  changed_when: false
+
+- name: Apply Kubernetes manifests
+  ansible.builtin.command: kubectl apply -f {{ item }}
+  loop: "{{ kubernetes_manifests }}"
+  changed_when: true
+
+- name: Pin the application image tag
+  ansible.builtin.command: >-
+    kubectl -n {{ k8s_namespace }} set image deployment/{{ deployment_name }}
+    {{ deployment_name }}={{ image_repository }}:{{ image_tag }}
+  changed_when: true
+
+- name: Wait for the application rollout
+  ansible.builtin.command: >-
+    kubectl rollout status deployment/{{ deployment_name }}
+    -n {{ k8s_namespace }} --timeout=300s
+  changed_when: false
+
+- name: Smoke test nginx inside the deployment
+  ansible.builtin.command: >-
+    kubectl exec -n {{ k8s_namespace }} deployment/{{ deployment_name }}
+    -- curl --fail --silent --show-error http://127.0.0.1/
+  register: gke_smoke
+  changed_when: false
+  failed_when: gke_smoke.rc != 0 or 'html' not in (gke_smoke.stdout | lower)

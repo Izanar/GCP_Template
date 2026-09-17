@@ -1,0 +1,22 @@
+---
+- name: Clone application source
+  ansible.builtin.git:
+    repo: "{{ app_repo_url }}"
+    dest: "{{ app_cache_dir }}"
+    clone: true
+    update: true
+    depth: 1
+
+- name: Copy static app files into destination
+  ansible.builtin.copy:
+    src: "{{ app_cache_dir }}/html/"
+    dest: "{{ app_dest_dir }}"
+    owner: www-data
+    group: www-data
+    mode: preserve
+    remote_src: true
+
+- name: Remove application checkout cache
+  ansible.builtin.file:
+    path: "{{ app_cache_dir }}"
+    state: absent

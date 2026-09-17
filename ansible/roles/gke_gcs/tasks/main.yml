@@ -1,0 +1,81 @@
+---
+- name: Validate GCS delivery settings
+  ansible.builtin.assert:
+    that:
+      - audio_bucket_name is match('^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$')
+      - cdn_domain is match('^[a-z0-9][a-z0-9.-]+[a-z0-9]$')
+    fail_msg: Set AUDIO_BUCKET_NAME and CDN_DOMAIN from the gke-gcs-cdn Terraform outputs
+
+- name: Check deployment tools
+  ansible.builtin.command: "{{ item }}"
+  loop:
+    - gsutil version
+    - git --version
+    - kubectl version --client
+  changed_when: false
+
+- name: Upload application audio to private GCS
+  ansible.builtin.command:
+    argv:
+      - bash
+      - "{{ playbook_dir }}/../../scripts/sync-audio-to-gcs.sh"
+      - "{{ app_repo_url }}"
+      - "{{ audio_bucket_name }}"
+  changed_when: true
+
+- name: Allocate temporary manifests directory
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: gcp-template-s3-
+  register: gke_gcs_manifests
+
+- name: Deploy GCS-aware application
+  block:
+    - name: Render GCS nginx config and deployment
+      ansible.builtin.template:
+        src: "{{ item }}.j2"
+        dest: "{{ gke_gcs_manifests.path }}/{{ item }}"
+        mode: '0600'
+      loop:
+        - configmap.yaml
+        - deployment.yaml
+
+    - name: Deploy manifests and verify nginx
+      ansible.builtin.include_role:
+        name: "{{ playbook_dir }}/../roles/gke"
+      vars:
+        kubernetes_manifests:
+          - "{{ playbook_dir }}/../../kubernetes/base/namespace.yaml"
+          - "{{ gke_gcs_manifests.path }}/configmap.yaml"
+          - "{{ gke_gcs_manifests.path }}/deployment.yaml"
+          - "{{ playbook_dir }}/../../kubernetes/base/service.yaml"
+
+    - name: Verify audio through nginx redirect and Cloud CDN
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - exec
+          - -n
+          - "{{ k8s_namespace }}"
+          - "deployment/{{ deployment_name }}"
+          - --
+          - curl
+          - --fail
+          - --silent
+          - --show-error
+          - --location
+          - --max-time
+          - '30'
+          - --output
+          - /dev/null
+          - http://127.0.0.1/audio/rain.mp3
+      register: gke_gcs_audio_check
+      changed_when: false
+      retries: 12
+      delay: 10
+      until: gke_gcs_audio_check.rc == 0
+  always:
+    - name: Remove temporary manifests
+      ansible.builtin.file:
+        path: "{{ gke_gcs_manifests.path }}"
+        state: absent
