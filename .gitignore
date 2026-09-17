@@ -17,15 +17,17 @@ Thumbs.db
 .terraform/
 *.tfstate
 *.tfstate.backup
-# Lock files generated inside Terragrunt env directories (kept in src/* instead)
-envs/*/.terraform.lock.hcl
-
-# State/plan backups must never be committed.
+# State/plan backups must never be committed
 *.tfstate.*
 *.tfplan
 .state/
 
-# Terragrunt
+# Lock files - regenerate per-project/provider on init. Never commit .terraform.lock.hcl
+**/.terraform.lock.hcl
+src/*/.terraform.lock.hcl
+envs/*/.terraform.lock.hcl
+
+# Terragrunt cache
 .terragrunt-cache/
 
 # Build outputs
@@ -37,6 +39,7 @@ coverage/
 # Python
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Docker
 *.local
@@ -46,3 +49,6 @@ gha-creds-*.json
 terragrunt-debug.tfvars.json
 terragrunt_rendered.json
 *.pem
+
+# Local tool venv
+venvs/
