@@ -81,8 +81,12 @@ if [[ "$SCENARIO" == gce ]]; then
   runner_ip="$(curl -fsS --max-time 15 https://api.ipify.org)"
   export TF_VAR_ssh_cidr_blocks="[\"${runner_ip}/32\"]"
 fi
+# Verify the project when the Cloud Resource Manager API is available; if it is
+# disabled, Terraform will still validate the project during apply.
 if [[ "$SCENARIO" != local-wsl ]]; then
-  gcloud projects describe "$GOOGLE_PROJECT" >/dev/null
+  if ! CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud projects describe "$GOOGLE_PROJECT" >/dev/null 2>&1; then
+    echo "WARNING: could not verify project '$GOOGLE_PROJECT' via Cloud Resource Manager (API may be disabled or no permission). Continuing; terraform apply will validate it." >&2
+  fi
   if [[ -n "${BUDGET_EMAIL:-}" && -z "${BILLING_ACCOUNT:-}" ]]; then
     echo 'BILLING_ACCOUNT is required with BUDGET_EMAIL' >&2; exit 1
   fi
