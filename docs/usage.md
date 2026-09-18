@@ -23,6 +23,25 @@ make install-tools
 `europe-west1`), email для бюджета (опционально) и подтверждение расходов.
 Для `gce` дополнительно: путь к SSH-ключу; SSH открывается только с вашего IP (`/32`).
 
+## Аутентификация: личный gcloud или сервисный аккаунт
+
+Облачные сценарии работают с любым из двух способов:
+
+1. **Личный аккаунт** (интерактивно):
+   ```bash
+   gcloud auth login
+   gcloud auth application-default login   # ADC для Terraform
+   gcloud config set project <PROJECT_ID>
+   ```
+2. **Сервисный аккаунт (SA-ключ JSON)** — без интерактива:
+   ```bash
+   gcloud auth activate-service-account --key-file=<путь/к/sa-key.json>
+   export GOOGLE_APPLICATION_CREDENTIALS=<путь/к/sa-key.json>  # ADC для Terraform
+   export GOOGLE_PROJECT=<PROJECT_ID>
+   ```
+   Ключ храните вне репозитория (например, `~/.config/gcloud/`), права на файл
+   `600`. SA нужны роли `Compute Admin` (для `gce`) и `Service Usage Consumer`.
+
 ## Переменные окружения
 
 | Переменная | Назначение | Дефолт |

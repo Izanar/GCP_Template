@@ -22,9 +22,13 @@ pytest, деплой `local-wsl`. Это уже выполнено в рамка
    gcloud auth application-default login
    gcloud config set project <PROJECT_ID>
    ```
+   Альтернатива — SA-ключ JSON (без интерактива): см. «Аутентификация» в
+   `docs/usage.md` (`gcloud auth activate-service-account` +
+   `GOOGLE_APPLICATION_CREDENTIALS`).
 3. **Включённые API**: `compute.googleapis.com`, `container.googleapis.com`,
    `secretmanager.googleapis.com`, `monitoring.googleapis.com`
-   (для бюджетов — `billingbudgets.googleapis.com`).
+   (для бюджетов — `billingbudgets.googleapis.com`; для бюджетов и чтения
+   проекта Terraform'ом — `cloudresourcemanager.googleapis.com`).
 4. **SSH-ключ** `~/.ssh/id_rsa(.pub)` — для сценария `gce`.
 5. **GitHub SSH-доступ** — уже настроен (пуш в `git@github.com:Izanar/GCP_Template.git`).
 6. **kubectl** — для GKE-сценариев и local-wsl.
