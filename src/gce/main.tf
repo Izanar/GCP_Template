@@ -97,6 +97,11 @@ resource "google_monitoring_notification_channel" "budget_email" {
   }
 }
 
+# Requires the Cloud Resource Manager API; only read when a budget is configured.
+data "google_project" "current" {
+  count = local.budget_enabled ? 1 : 0
+}
+
 resource "google_billing_budget" "project" {
   count = local.budget_enabled ? 1 : 0
 
@@ -104,7 +109,7 @@ resource "google_billing_budget" "project" {
   display_name    = "${var.project_name}-${var.environment}-monthly-gce"
 
   budget_filter {
-    projects = ["projects/${data.google_project.current.number}"]
+    projects = ["projects/${data.google_project.current[0].number}"]
   }
 
   amount {
@@ -127,5 +132,3 @@ resource "google_billing_budget" "project" {
 locals {
   budget_enabled = trimspace(var.budget_email) != "" && trimspace(var.billing_account) != ""
 }
-
-data "google_project" "current" {}

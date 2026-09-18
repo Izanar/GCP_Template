@@ -44,7 +44,7 @@ make install-tools
 make install-tools              # terraform, terragrunt, ansible, линтеры
 make install-tools SCENARIO=gce # + Google Cloud CLI (gcloud, gsutil)
 make install-tools SCENARIO=gke-autopilot  # + gcloud, kubectl, gke-gcloud-auth-plugin
-make install-tools SCENARIO=local-wsl      # + kubectl
+make install-tools SCENARIO=local-wsl      # только базовые инструменты (k3s ставится отдельно)
 make validate                   # fmt + validate + yamllint + ansible-lint + shellcheck
 make init ENV=gce               # terragrunt init
 make plan ENV=gce               # terragrunt plan

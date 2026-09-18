@@ -43,8 +43,9 @@ kubectl and gsutil for cloud scenarios.
 (Terraform, Terragrunt, Google Cloud CLI, kubectl, Ansible, linters).
 Use `make install-tools SCENARIO=<scenario>` to install only what a scenario
 needs: `gce` adds gcloud/gsutil, `gke-*` add gcloud + kubectl +
-gke-gcloud-auth-plugin, `local-wsl` adds kubectl. Default `SCENARIO=all`
-installs the full set.
+gke-gcloud-auth-plugin. `local-wsl` installs base tools only — set up k3s
+manually with `./scripts/install-wsl-kubernetes.sh` when you want the local
+scenario. Default `SCENARIO=all` installs the full cloud set.
 
 ```bash
 # 1. Install tools (Terraform, Terragrunt, Ansible, Python deps)

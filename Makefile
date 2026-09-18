@@ -19,7 +19,8 @@
 #   gce                          base tools + Google Cloud CLI
 #   gke-autopilot | gke-gcs-cdn  base tools + Google Cloud CLI + kubectl
 #                                + gke-gcloud-auth-plugin
-#   local-wsl                    base tools + kubectl
+#   local-wsl                    base tools only (k3s/kubectl set up manually,
+#                                see scripts/install-wsl-kubernetes.sh)
 #
 # Requires Linux x86_64, make, curl, git, Python 3.11+ with venv, and CA certificates.
 # install-tools installs Terraform/Terragrunt, Google Cloud CLI and Python tooling
@@ -58,7 +59,7 @@ install-tools:
 ifneq ($(strip $(filter all gce gke-autopilot gke-gcs-cdn,$(SCENARIO))),)
 	$(MAKE) --no-print-directory install-gcloud
 endif
-ifneq ($(strip $(filter all gke-autopilot gke-gcs-cdn local-wsl,$(SCENARIO))),)
+ifneq ($(strip $(filter all gke-autopilot gke-gcs-cdn,$(SCENARIO))),)
 	$(MAKE) --no-print-directory install-kubectl
 endif
 ifneq ($(strip $(filter all gke-autopilot gke-gcs-cdn,$(SCENARIO))),)
