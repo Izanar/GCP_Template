@@ -75,9 +75,11 @@ make output ENV=gce             # показать outputs
 ```
 
 **`make deploy`** = `scripts/deploy.sh <scenario>`: init → plan → apply → деплой
-AI_Nginx (Ansible/kubectl) → **smoke-тест страницы и всех аудиодорожек**
-(проверяется, что каждый mp3 отдаётся с валидным содержимым). `make apply` —
-только инфраструктура, без приложения.
+AI_Nginx **через Ansible** (роль `nginx` — VM, `local_k8s` — k3s, `gke`/`gke_gcs` —
+GKE; nginx и копирование сайта+медиа делает роль; в `gke-gcs-cdn` медиа
+заливаются отдельно в приватный GCS) → **smoke-тест страницы и всех медиафайлов**
+(каждый аудио-URL должен отвечать HTTP 200/206). `make apply` — только
+инфраструктура, без приложения.
 
 ## Что где смотреть после деплоя
 

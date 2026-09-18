@@ -44,6 +44,7 @@
 | `playbooks/gce.yml` | `roles/nginx` | Настройка nginx на VM |
 | `playbooks/gke-deploy.yml` | `roles/gke` | Деплой манифестов `kubernetes/base` в GKE |
 | `playbooks/gke-gcs-deploy.yml` | `roles/gke_gcs` | Вариант с приватным GCS-аудио через CDN |
+| `playbooks/local-wsl.yml` | `roles/local_k8s` | Контент сайта+медиа на hostPath, манифесты в локальный k3s |
 
 ## Kubernetes (kubernetes/)
 

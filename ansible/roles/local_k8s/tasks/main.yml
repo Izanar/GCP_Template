@@ -1,0 +1,69 @@
+---
+# Local k3s scenario: site + media content on hostPath, manifests via kubectl.
+- name: Check kubectl is available
+  ansible.builtin.command: kubectl version --client
+  changed_when: false
+
+- name: Ensure application checkout directory exists
+  ansible.builtin.file:
+    path: "{{ local_k8s_app_checkout_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Clone application source with site and media
+  ansible.builtin.git:
+    repo: "{{ local_k8s_app_repo_url }}"
+    dest: "{{ local_k8s_app_checkout_dir }}"
+    version: "{{ local_k8s_app_repo_ref }}"
+    depth: 1
+
+- name: Require site content on disk
+  ansible.builtin.stat:
+    path: "{{ local_k8s_app_checkout_dir }}/html/index.html"
+  register: local_k8s_site_index
+
+- name: Require media directory on disk
+  ansible.builtin.stat:
+    path: "{{ local_k8s_app_checkout_dir }}/html/audio/rain.mp3"
+  register: local_k8s_site_audio
+
+- name: Fail if site or media files are missing
+  ansible.builtin.fail:
+    msg: "Application checkout is incomplete: {{ item }} missing"
+  when: not item.stat.exists
+  loop:
+    - "{{ local_k8s_site_index }}"
+    - "{{ local_k8s_site_audio }}"
+  loop_control:
+    label: "{{ item.invocation.module_args.path }}"
+
+- name: Make site content readable to the k3s container
+  ansible.builtin.file:
+    path: "{{ local_k8s_app_checkout_dir }}/html"
+    state: directory
+    mode: '0755'
+    recurse: true
+
+- name: Apply Kubernetes manifests
+  ansible.builtin.command: kubectl apply -f {{ item }}
+  loop: "{{ local_k8s_manifests }}"
+  changed_when: true
+
+- name: Wait for the application rollout
+  ansible.builtin.command: >-
+    kubectl rollout status deployment/{{ local_k8s_deployment_name }}
+    -n {{ local_k8s_namespace }} --timeout=180s
+  changed_when: false
+
+- name: Smoke test the page served by nginx
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ local_k8s_node_port }}/"
+    return_content: true
+    timeout: 30
+  register: local_k8s_smoke
+  become: false
+
+- name: Fail if the page is empty
+  ansible.builtin.fail:
+    msg: "nginx homepage is empty or unavailable"
+  when: local_k8s_smoke.status != 200 or 'html' not in (local_k8s_smoke.content | default('') | lower)

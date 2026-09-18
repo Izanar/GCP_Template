@@ -1,0 +1,12 @@
+---
+# Local k3s scenario defaults.
+local_k8s_app_repo_url: https://github.com/Izanar/AI_Nginx.git
+local_k8s_app_repo_ref: main
+local_k8s_app_checkout_dir: /opt/ai-nginx
+local_k8s_namespace: ai-nginx-demo
+local_k8s_deployment_name: ai-nginx-app
+local_k8s_node_port: 30080
+local_k8s_manifests:
+  - "{{ playbook_dir }}/../../kubernetes/local/namespace.yaml"
+  - "{{ playbook_dir }}/../../kubernetes/local/deployment.yaml"
+  - "{{ playbook_dir }}/../../kubernetes/local/service.yaml"

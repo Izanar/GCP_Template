@@ -1,0 +1,8 @@
+---
+- name: Deploy AI_Nginx to the local k3s cluster
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  roles:
+    - role: "{{ playbook_dir }}/../roles/local_k8s"
