@@ -7,10 +7,23 @@ K3S_VERSION="${1:-v1.31.1+k3s1}"
 sudo -v
 if command -v k3s >/dev/null 2>&1; then
   installed="$(k3s --version | head -1)"
-  [[ "$installed" == *" ${K3S_VERSION} "* ]] || {
-    echo "Existing k3s version differs: $installed. Upgrade explicitly before deploying." >&2
-    exit 1
+  # Accept any k3s >= the requested version (an installed newer k3s is fine).
+  required="${K3S_VERSION#v}"; required="${required%%+*}"
+  have="$(printf '%s' "$installed" | awk '{print $3}')"; have="${have#v}"; have="${have%%+*}"
+  min_ok() { # returns 0 if $1 >= $2 (dotted x.y.z compare)
+    local a b i
+    read -r -a a <<< "${1//./ }"; read -r -a b <<< "${2//./ }"
+    for i in 0 1 2; do
+      (( ${a[i]:-0} > ${b[i]:-0} )) && return 0
+      (( ${a[i]:-0} < ${b[i]:-0} )) && return 1
+    done
+    return 0
   }
+  if ! min_ok "$have" "$required"; then
+    echo "Existing k3s $have is older than required v$required. Upgrade explicitly before deploying." >&2
+    exit 1
+  fi
+  echo "Existing k3s $have satisfies the required minimum v$required."
 else
   installer="$(mktemp)"
   trap 'rm -f "$installer"' EXIT
