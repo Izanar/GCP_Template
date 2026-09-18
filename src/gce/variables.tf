@@ -32,9 +32,9 @@ variable "boot_image" {
 }
 
 variable "public_key_path" {
-  description = "Path to the SSH public key"
+  description = "Path to the SSH public key (empty to skip, e.g. destroy-only runs)"
   type        = string
-  default     = "~/.ssh/id_rsa.pub"
+  default     = ""
 }
 
 variable "ssh_cidr_blocks" {

@@ -48,4 +48,9 @@ Terraform/Terragrunt-шаблон для Google Cloud, созданный как
 - Код, скрипты, Ansible, k8s-манифесты, CI приведены к GCP (коммит `4f0c189`).
 - README.md переписан под GCP.
 - Документация `docs/`, `project_map.md`, этот файл — переписаны под GCP.
-- Живой E2E не проводился: нужны реальные учётные данные GCP (см. `docs/e2e.md`).
+- **Живой E2E `gce` проведён** (дата: сентябрь 2026, проект `main-483108`):
+  SA-ключ → `deploy.sh gce` (europe-west1-b, e2-micro Spot) → Ansible ок →
+  smoke-тест OK (Kyiv Skyline, HTTP 1766 bytes) → `destroy.sh gce` →
+  «7 destroyed», в проекте не осталось ресурсов шаблона. GKE-сценарии остаются
+  «НЕ в планах» (дорого).
+- Живой E2E для `gke-*` не проводился (дорого; см. `docs/e2e.md`).

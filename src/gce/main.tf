@@ -63,11 +63,17 @@ resource "google_compute_instance" "web" {
   }
 
   # Instance-level SSH key does not modify project-wide metadata.
-  metadata = {
-    block-project-ssh-keys = "true"
-    enable-oslogin         = "FALSE"
-    ssh-keys               = "ubuntu:${trimspace(file(pathexpand(var.public_key_path)))}"
-  }
+  # The key is optional: absent during destroy-only runs (file() must not be
+  # evaluated when no key file exists).
+  metadata = merge(
+    {
+      block-project-ssh-keys = "true"
+      enable-oslogin         = "FALSE"
+    },
+    var.public_key_path != "" && fileexists(pathexpand(var.public_key_path)) ? {
+      ssh-keys = "ubuntu:${trimspace(file(pathexpand(var.public_key_path)))}"
+    } : {}
+  )
 
   tags = ["${var.project_name}-web"]
 

@@ -31,7 +31,10 @@
 
 ## Что осталось (осознанно)
 
-- **Живой E2E на GCP** не проводился: нужны реальный проект, биллинг и явное
-  разрешение на расходы (см. `docs/e2e.md`).
+- **Живой E2E `gce` — выполнен** (SA-ключ, `europe-west1-b`, e2-micro Spot):
+  deploy → Ansible → smoke-тест OK → destroy (7 destroyed). Проблема «нет прав
+  `compute.firewalls.create`» решилась выдачей SA роли `Compute Admin`;
+  `data.google_project` сделан бюджет-only (проект без CRM API собирается).
+- **Живой E2E `gke-*` не проводился** — дорого, «НЕ в планах» (см. `CONTEXT.md`).
 - Секреты для `deploy.yml` (workload identity / service account key) заполняются
   при первом реальном использовании.

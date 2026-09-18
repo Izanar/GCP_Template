@@ -49,5 +49,15 @@ curl http://<PUBLIC_IP>
 
 ## Статус
 
-Живой E2E на GCP **не проводился** — требуются реальные учётные данные и явное
-разрешение на расходы. Все «сухие» проверки проходят (`make validate`).
+**Живой E2E `gce` — проведён успешно** (сентябрь 2026, проект `main-483108`,
+регион `europe-west1`):
+```
+SA-ключ (GOOGLE_APPLICATION_CREDENTIALS) → ./scripts/deploy.sh gce →
+Ansible (nginx + AI_Nginx) → curl http://<public_ip> (Kyiv Skyline, Smoke test OK)
+→ ./scripts/destroy.sh gce → 7 destroyed → в проекте чисто
+```
+Нюансы, отработанные на живом прогоне: SA нужна роль `Compute Admin`;
+при выключенном Cloud Resource Manager API бюджет-блок автоматически не
+создаётся, а `deploy.sh` только предупреждает. Живой E2E для `gke-*` не
+проводился (дорого, «НЕ в планах»). Все «сухие» проверки проходят
+(`make validate`).
