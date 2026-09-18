@@ -7,7 +7,7 @@
 | `root.hcl` | Общий Terragrunt-конфиг: провайдер `google`, GCS/локальный backend |
 | `CONTEXT.md` | Контекст и правила для ИИ-агентов |
 | `README.md` | Описание проекта для людей |
-| `Makefile` | `make validate`, `make deploy SCENARIO=…`, `make destroy SCENARIO=…`, `make install-tools` |
+| `Makefile` | `make install-tools SCENARIO=…`, `make validate`, `make init/plan/apply/destroy/output ENV=…` |
 | `project_map.md` | Этот файл |
 
 ## Окружения Terragrunt (envs/)

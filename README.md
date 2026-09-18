@@ -39,7 +39,12 @@ installed and configured, the AI_Nginx content served and a smoke test passed.
 
 Requirements: Terraform >= 1.9, Terragrunt >= 0.68, Ansible and gcloud,
 kubectl and gsutil for cloud scenarios.
-`make install-tools` installs everything into your home directory.
+`make install-tools` installs everything you need into your home directory
+(Terraform, Terragrunt, Google Cloud CLI, kubectl, Ansible, linters).
+Use `make install-tools SCENARIO=<scenario>` to install only what a scenario
+needs: `gce` adds gcloud/gsutil, `gke-*` add gcloud + kubectl +
+gke-gcloud-auth-plugin, `local-wsl` adds kubectl. Default `SCENARIO=all`
+installs the full set.
 
 ```bash
 # 1. Install tools (Terraform, Terragrunt, Ansible, Python deps)
@@ -73,8 +78,9 @@ manual GitHub Actions deployment and required secrets.
 
 ```bash
 make help                          # показать все доступные команды
+make install-tools                 # установить все инструменты (SCENARIO=all)
+make install-tools SCENARIO=gce    # или: gke-autopilot | gke-gcs-cdn | local-wsl
 make validate                      # статические проверки (Terraform, Ansible, K8s, Shell)
-make install-tools                 # установить Terraform, Terragrunt, Ansible и Python-инструменты
 make init ENV=<scenario>          # terragrunt init для выбранного сценария
 make plan ENV=<scenario>          # terragrunt plan
 make apply ENV=<scenario>         # terragrunt apply (создаёт ресурсы!)

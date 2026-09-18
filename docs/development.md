@@ -12,11 +12,13 @@ sudo apt install make curl git python3-venv
 ## Основные команды
 
 ```bash
-make install-tools              # установить инструменты
-make validate                   # fmt + validate + линтеры + pytest
+make install-tools              # установить инструменты (SCENARIO=all|gce|gke-*|local-wsl)
+make validate                   # fmt + validate + линтеры
 make fmt                        # форматирование terraform/hcl/yaml
-make deploy SCENARIO=local-wsl  # деплой сценария (см. usage.md)
-make destroy SCENARIO=local-wsl
+make init ENV=local-wsl         # terragrunt init
+make plan ENV=local-wsl         # terragrunt plan
+make apply ENV=local-wsl        # terragrunt apply (полный деплой: ./scripts/deploy.sh)
+make destroy ENV=local-wsl
 pre-commit run -a               # хуки вручную
 ```
 

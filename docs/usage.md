@@ -42,10 +42,19 @@ make install-tools
 
 ```bash
 make install-tools              # terraform, terragrunt, ansible, линтеры
-make validate                   # fmt + validate + yamllint + ansible-lint + shellcheck + pytest
-make deploy SCENARIO=gce        # обёртка над scripts/deploy.sh
-make destroy SCENARIO=gce
+make install-tools SCENARIO=gce # + Google Cloud CLI (gcloud, gsutil)
+make install-tools SCENARIO=gke-autopilot  # + gcloud, kubectl, gke-gcloud-auth-plugin
+make install-tools SCENARIO=local-wsl      # + kubectl
+make validate                   # fmt + validate + yamllint + ansible-lint + shellcheck
+make init ENV=gce               # terragrunt init
+make plan ENV=gce               # terragrunt plan
+make apply ENV=gce CONFIRM_COSTS=yes   # terragrunt apply (создаёт ресурсы!)
+make destroy ENV=gce            # terragrunt destroy
+make output ENV=gce             # показать outputs
 ```
+
+Полный деплой сценария (init → plan → apply → Ansible → smoke-тест) выполняет
+`./scripts/deploy.sh <scenario>`; `make apply/destroy` — тонкие обёртки над Terragrunt.
 
 ## Что где смотреть после деплоя
 
