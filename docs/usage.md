@@ -1,5 +1,27 @@
 # Использование GCP_Template
 
+## Установка инструментов: `make install-tools [SCENARIO=<scenario>]`
+
+Необязательный параметр `SCENARIO` выбирает, какой набор инструментов ставить.
+Используйте его, чтобы не тянуть тяжёлые облачные инструменты, если нужен только
+один сценарий:
+
+| Значение `SCENARIO` | Что ставится | Когда использовать |
+|---|---|---|
+| `all` (по умолчанию) | Base tools (Terraform, Terragrunt, Python venv + `ansible-core`, `ansible-lint`, `yamllint`, `pre-commit`, `shellcheck-py`) + Google Cloud CLI (`gcloud`, `gsutil`) + `kubectl` + `gke-gcloud-auth-plugin` | Пробуете несколько / все сценарии или пока не решили |
+| `gce` | Base tools + Google Cloud CLI (`gcloud`, `gsutil`) | Только сценарий `gce` (Compute Engine + nginx через Ansible) |
+| `gke-autopilot` | Base tools + Google Cloud CLI + `kubectl` + `gke-gcloud-auth-plugin` | Только сценарий `gke-autopilot` |
+| `gke-gcs-cdn` | Base tools + Google Cloud CLI + `kubectl` + `gke-gcloud-auth-plugin` | Только сценарий `gke-gcs-cdn` (GKE + приватный GCS + Cloud CDN) |
+| `local-wsl` | Только base tools (без gcloud, без kubectl) | Только сценарий `local-wsl` — k3s/kubectl ставятся отдельно через `./scripts/install-wsl-kubernetes.sh` |
+
+```bash
+make install-tools                         # то же, что SCENARIO=all — полный облачный набор
+make install-tools SCENARIO=gce            # base + gcloud/gsutil
+make install-tools SCENARIO=gke-autopilot  # base + gcloud + kubectl + gke-gcloud-auth-plugin
+make install-tools SCENARIO=gke-gcs-cdn    # тот же набор, что и для gke-autopilot
+make install-tools SCENARIO=local-wsl      # только base, быстрее всего, без облачных загрузок
+```
+
 ## Быстрый старт (без облака)
 
 ```bash

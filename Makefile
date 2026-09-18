@@ -86,8 +86,8 @@ install-base:
 	  python3 -m venv $(PYVENV)/.. 2>/dev/null || python3 -m venv --without-pip $(PYVENV)/..; \
 	fi
 	@$(PYVENV)/python -m pip --version >/dev/null 2>&1 || { \
-	  echo "Pip not found in venv, bootstrapping ensurepip..."; \
-	  $(PYVENV)/python -m ensurepip --default-pip; \
+	  echo "Pip not found in venv, bootstrapping pip..."; \
+	  $(PYVENV)/python -m ensurepip --default-pip 2>/dev/null || { curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py && $(PYVENV)/python /tmp/get-pip.py && rm -f /tmp/get-pip.py; }; \
 	  $(PYVENV)/python -m pip install -q --upgrade pip; }
 	$(PYVENV)/python -m pip install -q ansible-core ansible-lint yamllint pre-commit shellcheck-py
 

@@ -39,13 +39,30 @@ installed and configured, the AI_Nginx content served and a smoke test passed.
 
 Requirements: Terraform >= 1.9, Terragrunt >= 0.68, Ansible and gcloud,
 kubectl and gsutil for cloud scenarios.
-`make install-tools` installs everything you need into your home directory
-(Terraform, Terragrunt, Google Cloud CLI, kubectl, Ansible, linters).
-Use `make install-tools SCENARIO=<scenario>` to install only what a scenario
-needs: `gce` adds gcloud/gsutil, `gke-*` add gcloud + kubectl +
-gke-gcloud-auth-plugin. `local-wsl` installs base tools only — set up k3s
-manually with `./scripts/install-wsl-kubernetes.sh` when you want the local
-scenario. Default `SCENARIO=all` installs the full cloud set.
+`make install-tools [SCENARIO=<scenario>]` installs everything you need into
+your home directory (Terraform, Terragrunt, Google Cloud CLI, kubectl,
+Ansible, linters). The optional `SCENARIO` parameter selects which tool set
+to install — use it to skip heavy cloud tools when you only need one scenario:
+
+| `SCENARIO` value | What gets installed | When to use |
+|---|---|---|
+| `all` (default) | Base tools (Terraform, Terragrunt, Python venv + `ansible-core`, `ansible-lint`, `yamllint`, `pre-commit`, `shellcheck-py`) + Google Cloud CLI (`gcloud`, `gsutil`) + `kubectl` + `gke-gcloud-auth-plugin` | You plan to try several / all scenarios, or are not sure yet |
+| `gce` | Base tools + Google Cloud CLI (`gcloud`, `gsutil`) | Only the `gce` scenario (Compute Engine + nginx via Ansible) |
+| `gke-autopilot` | Base tools + Google Cloud CLI + `kubectl` + `gke-gcloud-auth-plugin` | Only the `gke-autopilot` scenario |
+| `gke-gcs-cdn` | Base tools + Google Cloud CLI + `kubectl` + `gke-gcloud-auth-plugin` | Only the `gke-gcs-cdn` scenario (GKE + private GCS + Cloud CDN) |
+| `local-wsl` | Base tools only (no gcloud, no kubectl) | Only the `local-wsl` scenario — set up k3s/kubectl manually with `./scripts/install-wsl-kubernetes.sh` when you want the local scenario |
+
+Examples:
+
+```bash
+make install-tools                    # same as SCENARIO=all — full cloud set
+make install-tools SCENARIO=gce       # base + gcloud/gsutil
+make install-tools SCENARIO=gke-autopilot  # base + gcloud + kubectl + gke-gcloud-auth-plugin
+make install-tools SCENARIO=gke-gcs-cdn    # same set as gke-autopilot
+make install-tools SCENARIO=local-wsl      # base only, fastest, no cloud downloads
+```
+
+Steps after installing tools:
 
 ```bash
 # 1. Install tools (Terraform, Terragrunt, Ansible, Python deps)
