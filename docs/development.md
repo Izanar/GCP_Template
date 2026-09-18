@@ -15,10 +15,11 @@ sudo apt install make curl git python3-venv
 make install-tools              # установить инструменты (SCENARIO=all|gce|gke-*|local-wsl)
 make validate                   # fmt + validate + линтеры
 make fmt                        # форматирование terraform/hcl/yaml
-make init ENV=local-wsl         # terragrunt init
-make plan ENV=local-wsl         # terragrunt plan
-make apply ENV=local-wsl        # terragrunt apply (полный деплой: ./scripts/deploy.sh)
-make destroy ENV=local-wsl
+make deploy ENV=local-wsl       # полный сценарий: инфра + AI_Nginx + smoke-тест
+make init ENV=local-wsl         # только terragrunt init
+make plan ENV=local-wsl         # только terragrunt plan
+make apply ENV=local-wsl        # только инфраструктура (приложение ставит deploy)
+make destroy ENV=local-wsl      # снять инфраструктуру
 pre-commit run -a               # хуки вручную
 ```
 

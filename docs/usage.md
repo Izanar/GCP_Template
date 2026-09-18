@@ -60,20 +60,24 @@ make install-tools
 ## Makefile
 
 ```bash
+make deploy ENV=local-wsl       # ПОЛНЫЙ сценарий: инфра + AI_Nginx + smoke-тест
+make deploy ENV=gce CONFIRM_COSTS=yes   # облачный сценарий одной командой
+make destroy ENV=local-wsl      # снять всё
 make install-tools              # terraform, terragrunt, ansible, линтеры
 make install-tools SCENARIO=gce # + Google Cloud CLI (gcloud, gsutil)
 make install-tools SCENARIO=gke-autopilot  # + gcloud, kubectl, gke-gcloud-auth-plugin
 make install-tools SCENARIO=local-wsl      # только базовые инструменты (k3s ставится отдельно)
 make validate                   # fmt + validate + yamllint + ansible-lint + shellcheck
-make init ENV=gce               # terragrunt init
-make plan ENV=gce               # terragrunt plan
-make apply ENV=gce CONFIRM_COSTS=yes   # terragrunt apply (создаёт ресурсы!)
-make destroy ENV=gce            # terragrunt destroy
+make init ENV=gce               # только terragrunt init (без приложения)
+make plan ENV=gce               # только terragrunt plan (без приложения)
+make apply ENV=gce CONFIRM_COSTS=yes   # только инфраструктура; приложение ставит deploy!
 make output ENV=gce             # показать outputs
 ```
 
-Полный деплой сценария (init → plan → apply → Ansible → smoke-тест) выполняет
-`./scripts/deploy.sh <scenario>`; `make apply/destroy` — тонкие обёртки над Terragrunt.
+**`make deploy`** = `scripts/deploy.sh <scenario>`: init → plan → apply → деплой
+AI_Nginx (Ansible/kubectl) → **smoke-тест страницы и всех аудиодорожек**
+(проверяется, что каждый mp3 отдаётся с валидным содержимым). `make apply` —
+только инфраструктура, без приложения.
 
 ## Что где смотреть после деплоя
 

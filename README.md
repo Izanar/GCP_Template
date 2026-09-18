@@ -82,14 +82,22 @@ make help                          # показать все доступные 
 make install-tools                 # установить все инструменты (SCENARIO=all)
 make install-tools SCENARIO=gce    # или: gke-autopilot | gke-gcs-cdn | local-wsl
 make validate                      # статические проверки (Terraform, Ansible, K8s, Shell)
-make init ENV=<scenario>          # terragrunt init для выбранного сценария
-make plan ENV=<scenario>          # terragrunt plan
-make apply ENV=<scenario>         # terragrunt apply (создаёт ресурсы!)
+make deploy ENV=<scenario>         # ПОЛНЫЙ сценарий: инфраструктура + AI_Nginx + smoke-тест
+make destroy ENV=<scenario>        # снять всё, что создал deploy
+make init ENV=<scenario>          # только terragrunt init (без приложения)
+make plan ENV=<scenario>          # только terragrunt plan (без приложения)
+make apply ENV=<scenario>         # только инфраструктура; приложение ставит deploy!
 make output ENV=<scenario>        # показать выходные данные Terraform
-make destroy ENV=<scenario>       # terragrunt destroy
 make fmt                           # отформатировать Terraform-код
 make precommit                     # запустить pre-commit хуки
 ```
+
+> **`make apply` ≠ работающее приложение.** `apply` создаёт только инфраструктуру
+> (VM/кластер/сеть). Приложение AI_Nginx разворачивается на следующем шаге —
+> `make deploy ENV=<scenario>` делает и то, и другое одной командой и завершается
+> smoke-тестом: страница загружена и **все аудиодорожки отдаются с валидным
+> содержимым** («запустить → увидеть приложение → услышать звук»).
+> Для облачных сценариев `make deploy` требует `CONFIRM_COSTS=yes`.
 
 Поддерживаемые значения `ENV`: `gce`, `gke-autopilot`, `gke-gcs-cdn`, `local-wsl`.
 По умолчанию: `local-wsl`.

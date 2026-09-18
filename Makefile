@@ -7,7 +7,8 @@
 #   make init [ENV=..]   Run `terragrunt init` for one environment
 #   make plan  [ENV=..]  Run `terragrunt plan`
 #   make apply [ENV=..]  Run `terragrunt apply` (creates billable resources!)
-#   make destroy [ENV=..] Run `terragrunt destroy`
+#   make deploy [ENV=..]  Full scenario: infra (terragrunt) + application + audio smoke test
+#   make teardown [ENV=..] Destroy the scenario infrastructure
 #   make output [ENV=..] Show terraform outputs
 #
 # ENV selects the Terragrunt environment directory under envs/ (default: local-wsl).
@@ -44,7 +45,8 @@ GCLOUD_URL := https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-
 
 .PHONY: help validate validate-tf validate-ansible validate-k8s validate-shell \
         fmt init plan apply destroy output install-tools install-base \
-        install-gcloud install-kubectl install-gke-auth lint precommit test
+        install-gcloud install-kubectl install-gke-auth deploy teardown \
+        lint precommit test
 
 help:
 	@grep -E '^[a-zA-Z_-]+:' $(MAKEFILE_LIST) | sed 's/:.*//' | sort -u | sed 's/^/  make /'
@@ -140,6 +142,15 @@ apply:
 
 destroy:
 	cd $(ENV_DIR) && $(TERRAGRUNT) destroy
+
+# Full scenario = infrastructure + application + smoke test (see scripts/deploy.sh).
+# CONFIRM_COSTS=yes is required for cloud scenarios.
+deploy:
+	@if [ "$(ENV)" != local-wsl ] && [ "$(CONFIRM_COSTS)" != yes ]; then echo 'Use CONFIRM_COSTS=yes to accept GCP charges'; exit 1; fi
+	./scripts/deploy.sh $(ENV)
+
+teardown:
+	./scripts/destroy.sh $(ENV)
 
 output:
 	cd $(ENV_DIR) && $(TERRAGRUNT) output

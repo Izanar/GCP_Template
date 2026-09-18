@@ -102,6 +102,55 @@ if [[ "$SCENARIO" != local-wsl ]]; then
 fi
 trap 'echo "Deployment failed. Resources may remain; run scripts/destroy.sh for this scenario using the same state and project." >&2' ERR
 
+# Full smoke check: the page must load AND the audio it references must be
+# reachable with valid MP3 content ("run the scenario -> see the app -> hear it").
+smoke_test() { # $1 = base URL (audio paths are relative to it)
+  local base="$1" page audio_srcs f code bytes magic
+  page="$(mktemp)"
+  curl -fsSL --max-time 30 "$base" -o "$page" || { echo "Smoke test FAILED: page not reachable at $base" >&2; rm -f "$page"; return 1; }
+  [[ -s "$page" ]] || { echo 'Smoke test FAILED: page is empty' >&2; rm -f "$page"; return 1; }
+  echo ">>> Page OK ($(wc -c < "$page") bytes): $(grep -o '<title>[^<]*</title>' "$page" | head -1)"
+  audio_srcs="$(grep -oE 'src="[^"]*\.(mp3|ogg|wav|m4a)"' "$page" | sed 's/src="//; s/"//' | sort -u || true)"
+  if [[ -z "$audio_srcs" ]]; then
+    echo '>>> No audio referenced on the page; content smoke test OK'
+    rm -f "$page"; return 0
+  fi
+  for f in $audio_srcs; do
+    case "$f" in
+      http://*|https://*) url="$f" ;;
+      /*)                 url="${base}${f}" ;;
+      *)                  url="${base}/${f}" ;;
+    esac
+    # shellcheck disable=SC2086
+    code="$(curl -fsSL --max-time 60 -r 0-4095 -o /tmp/smoke-audio.bin -w '%{http_code}' "$url" 2>/dev/null || true)"
+    bytes="$(wc -c < /tmp/smoke-audio.bin 2>/dev/null || echo 0)"
+    magic="$(head -c 3 /tmp/smoke-audio.bin 2>/dev/null | xxd -p || true)"
+    # Some MP3s start with ID3 tag or zero padding; accept them, or any MP3
+    # frame sync (fffb/fff3/fffa/fff2) within the first 4 KiB.
+    ok=false
+    if [[ "$code" == 200 || "$code" == 206 ]] && (( bytes > 0 )); then
+      case "$magic" in
+        fff[be]d|fff[3a]4|fff[32]0|494433|4f6753|524946*) ok=true ;;
+        *)
+          # ID3/padded MP3s: accept any frame sync within the first 4 KiB.
+          if xxd -p /tmp/smoke-audio.bin 2>/dev/null | tr -d '\n' | grep -qE 'fff[9a-f]' ; then ok=true; fi
+          ;;
+      esac
+    fi
+    if [[ "$ok" == true ]]; then
+      echo ">>> Audio OK [$code, $bytes bytes] $f"
+    else
+      echo "Smoke test FAILED: audio '$f' not playable (HTTP=$code, bytes=$bytes)" >&2
+      rm -f "$page" /tmp/smoke-audio.bin; return 1
+    fi
+  done
+  rm -f "$page" /tmp/smoke-audio.bin
+  local n
+  # shellcheck disable=SC2086  # word splitting is intended: one path per line
+  n="$(printf '%s\n' $audio_srcs | wc -l)"
+  echo ">>> Smoke test OK: page + $n audio track(s) served"
+}
+
 echo ">>> Applying scenario '${SCENARIO}' ..."
 tg init -input=false
 tg plan -input=false
@@ -121,7 +170,7 @@ INV
   ANSIBLE_ROLES_PATH="ansible/roles" ansible-playbook -i "$inventory" ansible/playbooks/gce.yml
   nginx_url="http://${public_ip}"
   echo ">>> AI_Nginx demo is live at: $nginx_url"
-  curl -fsSL "$nginx_url" >/dev/null && echo ">>> Smoke test OK"
+  smoke_test "$nginx_url"
   ;;
 
   gke-autopilot|gke-gcs-cdn)
@@ -157,7 +206,7 @@ INV
   node_port="$(tg output -raw node_port)"
   echo ">>> AI_Nginx demo is live at: http://localhost:${node_port} (inside WSL)"
   echo ">>> From Windows use the WSL address, e.g.: http://$(hostname -I | awk '{print $1}'):${node_port}"
-  curl -fsSL "http://localhost:${node_port}" >/dev/null && echo ">>> Smoke test OK"
+  smoke_test "http://localhost:${node_port}"
   ;;
 
   *)
